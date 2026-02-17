@@ -1,30 +1,15 @@
-from fastapi import FastAPI, BackgroundTasks
+from fastapi import FastAPI
 from pydantic import BaseModel
 import uvicorn
 import joblib
 import numpy as np
-import os
-import smtplib
-from email.mime.text import MIMEText
 
 app = FastAPI()
 
-# Load model once
+# Load model once (put model.pkl in same folder)
 model = joblib.load("model.pkl")
 
-def send_email(to_email: str, subject: str, body: str):
-    sender = "rrawspractice@gmail.com"
-    password = "kkdrkwqxegzffjbt"
-
-    msg = MIMEText(body)
-    msg["Subject"] = subject
-    msg["From"] = sender
-    msg["To"] = to_email
-
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-        server.login(sender, password)
-        server.sendmail(sender, to_email, msg.as_string())
-
+   
 class HeartInput(BaseModel):
     Age: float
     Gender: int
@@ -36,7 +21,7 @@ class HeartInput(BaseModel):
     Troponin: float
 
 @app.post("/predict")
-def predict(data: HeartInput, background_tasks: BackgroundTasks):
+def predict(data: HeartInput):
     x = np.array([[
         data.Age,
         data.Gender,
@@ -50,33 +35,13 @@ def predict(data: HeartInput, background_tasks: BackgroundTasks):
 
     pred = model.predict(x)[0]
 
+    # if model supports probability
     confidence = None
     if hasattr(model, "predict_proba"):
         confidence = float(np.max(model.predict_proba(x)))
 
-    # ✅ Response for UI (fast)
-    result = {"prediction": str(pred), "confidence": confidence}
+    return {"prediction": str(pred), "confidence": confidence} 
 
-    # ✅ Email to Zapier (background - no timeout)
-    zapier_email = "rithick.rcmkq5@zapiermail.com"
-    if zapier_email:
-        email_body = (
-            f"Heart attack prediction result\n\n"
-            f"prediction: {result['prediction']}\n"
-            f"confidence: {result['confidence']}\n"
-            f"Age: {data.Age}, Gender: {data.Gender}, Heart_rate: {data.Heart_rate}\n"
-            f"SBP: {data.Systolic_blood_pressure}, DBP: {data.Diastolic_blood_pressure}\n"
-            f"Blood_sugar: {data.Blood_sugar}, CK_MB: {data.CK_MB}, Troponin: {data.Troponin}\n"
-        )
-
-        background_tasks.add_task(
-            send_email,
-            zapier_email,
-            "Heart attack prediction",
-            email_body
-        )
-
-    return result
 
 @app.get("/health")
 def health():

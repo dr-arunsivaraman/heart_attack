@@ -9,6 +9,20 @@ app = FastAPI()
 # Load model once (put model.pkl in same folder)
 model = joblib.load("model.pkl")
 
+def send_email(to_email, subject, body):
+    sender = "rrawspractice@gmail.com"
+    password = "Rithick6040$"
+
+    msg = MIMEText(body)
+    msg["Subject"] = subject
+    msg["From"] = sender
+    msg["To"] = to_email
+
+    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+        server.login(sender, password)
+        server.sendmail(sender, to_email, msg.as_string())
+        
+
 class HeartInput(BaseModel):
     Age: float
     Gender: int
@@ -39,7 +53,20 @@ def predict(data: HeartInput):
     if hasattr(model, "predict_proba"):
         confidence = float(np.max(model.predict_proba(x)))
 
-    return {"prediction": str(pred), "confidence": confidence}
+    return {"prediction": str(pred), "confidence": confidence} 
+    zapier_email = "rithick.rcmkq5@zapiermail.com"
+            email_body = f"""
+            prediction: {prediction}
+            confidence: {confidence}
+            filename: {filename}
+            """
+
+            send_email(
+                zapier_email,
+                "Heart attack prediction",
+                email_body
+            )
+
 
 @app.get("/health")
 def health():
